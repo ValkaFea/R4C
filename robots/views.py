@@ -1,7 +1,11 @@
 import json
+import io
+from openpyxl import Workbook
 from django.http import JsonResponse
+from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 from .models import Robot
 
 @csrf_exempt
@@ -44,3 +48,44 @@ def add_robot(request):
 
 
     return JsonResponse({'error': 'Invalid HTTP method'}, status=405)
+
+
+def generate_excel(request):
+
+    print("01")
+    wb = Workbook()
+    default_sheet = wb.active
+    wb.remove(default_sheet)
+
+    one_week_ago = timezone.now() - timezone.timedelta(weeks=1)
+    robots = Robot.objects.filter(created__gte=one_week_ago)
+
+    robot_counts = {}
+
+    for robot in robots:
+        model = robot.model
+        version = robot.version
+        key = (model, version)
+
+        if model not in robot_counts:
+            robot_counts[model] = {}
+        if version not in robot_counts[model]:
+            robot_counts[model][version] = 0
+
+        robot_counts[model][version] += 1
+
+    for model, versions in robot_counts.items():
+        ws = wb.create_sheet(title=f"Model_{model}")
+        ws.append(['Model', 'Version', 'Quantity'])
+
+        for version, count in versions.items():
+            ws.append([model, version, count])
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="robot_production_report.xlsx"'
+
+    wb.save(response)
+    return response
+
