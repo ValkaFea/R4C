@@ -15,10 +15,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+
+import orders
+import robots
 from robots import views
+from orders import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('add_robot/', views.add_robot, name='add_robot'),
-    path('generate_excel/', views.generate_excel, name='generate_excel'),
+    path('add_robot/', robots.views.add_robot, name='add_robot'),
+    path('generate_excel/', robots.views.generate_excel, name='generate_excel'),
+    path('create_order/', orders.views.create_order, name='create_order'),
 ]

@@ -52,7 +52,6 @@ def add_robot(request):
 
 def generate_excel(request):
 
-    print("01")
     wb = Workbook()
     default_sheet = wb.active
     wb.remove(default_sheet)

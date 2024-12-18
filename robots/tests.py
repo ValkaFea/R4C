@@ -6,7 +6,9 @@ import json
 from django.utils import timezone
 from openpyxl import load_workbook
 from .models import Robot
-
+from django.core import mail
+from orders.models import Order
+from customers.models import Customer
 
 class RobotAPITest(TestCase):
     def test_add_robot_success(self):
@@ -40,15 +42,6 @@ class RobotAPITest(TestCase):
         response = self.client.post(url, json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('Invalid date format', response.json()['error'])
-
-
-
-import datetime
-from django.test import TestCase
-from django.urls import reverse
-from django.utils import timezone
-from openpyxl import load_workbook
-from .models import Robot
 
 
 class GenerateExcelTest(TestCase):
@@ -89,3 +82,42 @@ class GenerateExcelTest(TestCase):
         sheet_x8 = workbook['Model_X8']
         self.assertEqual(sheet_x8.cell(row=2, column=2).value, 'gf')
         self.assertEqual(sheet_x8.cell(row=2, column=3).value, 1)
+
+
+
+class NotifyCustomerOnRobotCreationTest(TestCase):
+    def setUp(self):
+        self.customer_email = "customer@example.com"
+        self.robot_model = "RT"
+        self.robot_version = "DT"
+        self.robot_serial = f"{self.robot_model}-{self.robot_version}"
+
+        self.customer = Customer.objects.create(email=self.customer_email)
+
+        Order.objects.create(
+            customer=self.customer,
+            robot_serial=self.robot_serial
+        )
+
+    def test_email_sent_when_robot_becomes_available(self):
+
+        Robot.objects.create(
+            model=self.robot_model,
+            version=self.robot_version,
+            created=timezone.now()
+        )
+
+        self.assertEqual(len(mail.outbox), 1, "Ожидалось, что отправится одно письмо.")
+
+        email = mail.outbox[0]
+        self.assertEqual(email.subject, "Робот теперь в наличии!", "Неверная тема письма.")
+        self.assertIn(
+            f"модели {self.robot_model}, версии {self.robot_version}",
+            email.body,
+            "Тело письма не содержит правильную модель и версию робота."
+        )
+        self.assertEqual(
+            email.to,
+            [self.customer_email],
+            "Письмо отправлено не тому клиенту."
+        )
